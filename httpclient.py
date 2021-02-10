@@ -35,25 +35,46 @@ class HTTPResponse(object):
 class HTTPClient(object):
     #def get_host_port(self,url):
 
+    # if specified then the port in the parse otherwise 80
+    def get_port(self, parse):
+        if parse.port == None:
+            return 80
+        return parse.port
+
     def connect(self, host, port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((host, port))
         return None
 
+    # get the code from response
     def get_code(self, data):
-        return None
+        status = data.split("\r\n")[0].split()
+        code = status[1]
+        return int(code)
 
+    # get the header from response
     def get_headers(self,data):
-        return None
+        header = data.split("\r\n\r\n", 1)[0]
+        return header
 
+    # get the body from response
     def get_body(self, data):
-        return None
+        body = data.split("\r\n\r\n", 1)[-1]
+        return body
     
     def sendall(self, data):
         self.socket.sendall(data.encode('utf-8'))
         
     def close(self):
         self.socket.close()
+
+    # encode the post data
+    def get_post_data(self, args):
+        if args == None:
+            return 0, ''
+        else:
+            post_data = urllib.parse.urlencode(args)
+            return len(post_data), post_data
 
     # read everything from the socket
     def recvall(self, sock):
@@ -67,14 +88,54 @@ class HTTPClient(object):
                 done = not part
         return buffer.decode('utf-8')
 
+    # get method
     def GET(self, url, args=None):
-        code = 500
-        body = ""
+        parse = urllib.parse.urlparse(url)
+        host = socket.gethostbyname(parse.netloc.split(":")[0])
+        self.connect(host, self.get_port(parse))
+        path = parse.path
+        if path == '':
+            path = '/'
+        request = "GET "+ path + " HTTP/1.1\r\n"+"Host: "+parse.netloc+"\r\n"
+        request += "User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:85.0) Gecko/20100101 Firefox/85.0\r\nConnection: close\r\n"
+
+        request += "Accept: */*\r\n\r\n"
+        self.sendall(request)
+
+        self.socket.shutdown(socket.SHUT_WR)
+        response = self.recvall(self.socket)
+
+        self.close()
+
+        code = self.get_code(response)
+
+        body = self.get_body(response)
         return HTTPResponse(code, body)
 
+    # post method
     def POST(self, url, args=None):
-        code = 500
-        body = ""
+        parse = urllib.parse.urlparse(url)
+        host = socket.gethostbyname(parse.netloc.split(":")[0])
+        self.connect(host, self.get_port(parse))
+
+        length, post_data = self.get_post_data(args)
+        path = parse.path
+        if path == '':
+            path = '/'
+        request = "POST "+ path + " HTTP/1.1\r\n"+"Host: "+parse.netloc+"\r\n"
+        request += "User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:85.0) Gecko/20100101 Firefox/85.0\r\nConnection: close\r\n"
+        request += "Content-Type: application/x-www-form-urlencoded\r\n"
+        request += "Content-Length: " + str(length) + "\r\nAccept: */*\r\n\r\n" + post_data
+        self.sendall(request)
+
+        self.socket.shutdown(socket.SHUT_WR)
+        response = self.recvall(self.socket)
+
+        self.close()
+
+        code = self.get_code(response)
+
+        body = self.get_body(response)
         return HTTPResponse(code, body)
 
     def command(self, url, command="GET", args=None):
