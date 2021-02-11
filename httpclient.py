@@ -108,8 +108,10 @@ class HTTPClient(object):
         self.close()
 
         code = self.get_code(response)
-
         body = self.get_body(response)
+
+        print("Get Code: ", code)
+        print("Get Body: \n", body)
         return HTTPResponse(code, body)
 
     # post method
@@ -134,8 +136,10 @@ class HTTPClient(object):
         self.close()
 
         code = self.get_code(response)
-
         body = self.get_body(response)
+
+        print("Get Code: ", code)
+        print("Get Body: \n", body)
         return HTTPResponse(code, body)
 
     def command(self, url, command="GET", args=None):
